@@ -5,6 +5,10 @@ name = "pypi"
 
 [packages]
 kagglehub = "*"
+dash = "*"
+numpy = "*"
+matplotlib = "*"
+pandas = "*"
 
 [dev-packages]
 
