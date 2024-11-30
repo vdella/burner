@@ -9,6 +9,8 @@ dash = "*"
 numpy = "*"
 matplotlib = "*"
 pandas = "*"
+torch = "*"
+scikit-learn = "*"
 
 [dev-packages]
 
