@@ -1,56 +1,64 @@
-import kagglehub
-import os
+import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
-import torch
 
-# Download latest version
-path = kagglehub.dataset_download("sepandhaghighi/proton-exchange-membrane-pem-fuel-cell-dataset")
+# Constants
+R = 8.314  # Universal gas constant (J/mol·K)
+F = 96485  # Faraday's constant (C/mol)
+E0 = 1.229  # Standard reversible potential (V)
+alpha = 0.5  # Charge transfer coefficient
+i0_ref = 0.1  # Reference exchange current density (A/cm²) at 25°C
+T_ref = 298.15  # Reference temperature in Kelvin (25°C)
+activation_energy = 40000  # Activation energy for i0 (J/mol)
 
-# Define the base path to the extracted dataset # Replace with your extracted folder path
-cycling_potential_folder = os.path.join(path, 'Activation Test MEA Cycling Potential')
 
-print(cycling_potential_folder)
+# Temperature-dependent exchange current density
+def exchange_current_density(T):
+    return i0_ref * np.exp((activation_energy / R) * (1 / T_ref - 1 / T))
 
-# Initialize a list to store data from all CSV files
-all_data = []
 
-# Load and stack data from all CSV files
-for file in os.listdir(cycling_potential_folder):
-    if file.endswith('.csv'):
-        file_path = os.path.join(cycling_potential_folder, file)
-        data = pd.read_csv(file_path)
-        data['file_id'] = file  # Add file identifier
-        all_data.append(data)
+# Temperature-dependent ohmic resistance
+def ohmic_resistance(T, r_membrane_ref):
+    return r_membrane_ref * (T_ref / T)
 
-# Combine all the data into one DataFrame
-stacked_data = pd.concat(all_data, ignore_index=True)
 
-# Add a sequential time index for each test file
-stacked_data['time_step'] = stacked_data.groupby('file_id').cumcount()
-print(stacked_data)
+# PEMFC Voltage Model
+def pemfc_voltage_expanded(i, T, i_max, r_membrane_ref):
+    """Calculate expanded PEMFC voltage model."""
+    i0 = exchange_current_density(T)
+    R_ohmic = ohmic_resistance(T, r_membrane_ref)
 
-# Features and target preparation
-features = stacked_data[['time_step', 'applied_voltage']].values
-targets = stacked_data[['z_real', 'z_img']].values
+    # Activation overpotential (Tafel equation)
+    eta_activation = (R * T / (alpha * F)) * np.log(i / i0)
 
-# Normalize the features and targets
-scaler_features = StandardScaler()
-scaler_targets = StandardScaler()
+    # Ohmic overpotential
+    eta_ohmic = i * R_ohmic
 
-features_scaled = scaler_features.fit_transform(features)
-targets_scaled = scaler_targets.fit_transform(targets)
+    # Concentration overpotential
+    eta_concentration = - (R * T / F) * np.log(1 - i / i_max)
 
-# Split the data into training and test sets
-X_train, X_test, y_train, y_test = train_test_split(features_scaled, targets_scaled, test_size=0.2, random_state=42)
+    # Cell voltage
+    V = E0 - eta_activation - eta_ohmic + eta_concentration
+    return V
 
-# Convert to PyTorch tensors for time-series modeling
-X_train_tensor = torch.tensor(X_train, dtype=torch.float32).unsqueeze(1)  # Add sequence dimension
-y_train_tensor = torch.tensor(y_train, dtype=torch.float32)
-X_test_tensor = torch.tensor(X_test, dtype=torch.float32).unsqueeze(1)
-y_test_tensor = torch.tensor(y_test, dtype=torch.float32)
 
-# Print shape of tensors to confirm successful preparation
-print(f"Training Data Shape: {X_train_tensor.shape}, Target Shape: {y_train_tensor.shape}")
-print(f"Testing Data Shape: {X_test_tensor.shape}, Target Shape: {y_test_tensor.shape}")
+# Define parameter ranges
+current_density = np.linspace(0.01, 1.4, 100)  # Current density (A/cm²)
+temperatures = np.linspace(298.15, 353.15, 10)  # Temperatures (K)
+r_membrane_values = np.linspace(0.1, 0.3, 5)  # Membrane resistance (ohms·cm²)
+i_max_values = np.linspace(1.0, 2.0, 5)  # Maximum current density (A/cm²)
+
+# Generate data
+data = []
+for T in temperatures:
+    for r_membrane in r_membrane_values:
+        for i_max in i_max_values:
+            for i in current_density:
+                voltage = pemfc_voltage_expanded(i, T, i_max, r_membrane)
+                data.append([i, T, i_max, r_membrane, voltage])
+
+# Convert data to a pandas DataFrame
+df = pd.DataFrame(data, columns=['current_density', 'temperature', 'i_max', 'r_membrane', 'voltage'])
+
+# Save the data to a CSV file
+df.to_csv("pemfc_simulation_data.csv", index=False)
+print("Data saved to 'pemfc_simulation_data.csv'.")
