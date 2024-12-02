@@ -41,24 +41,27 @@ def pemfc_voltage_expanded(i, T, i_max, r_membrane_ref):
     return V
 
 
-# Define parameter ranges
-current_density = np.linspace(0.01, 1.4, 100)  # Current density (A/cm²)
-temperatures = np.linspace(298.15, 353.15, 10)  # Temperatures (K)
-r_membrane_values = np.linspace(0.1, 0.3, 5)  # Membrane resistance (ohms·cm²)
-i_max_values = np.linspace(1.0, 2.0, 5)  # Maximum current density (A/cm²)
+if __name__ == '__main__':
 
-# Generate data
-data = []
-for T in temperatures:
-    for r_membrane in r_membrane_values:
-        for i_max in i_max_values:
-            for i in current_density:
-                voltage = pemfc_voltage_expanded(i, T, i_max, r_membrane)
-                data.append([i, T, i_max, r_membrane, voltage])
+    # Define parameter ranges
+    current_density = np.linspace(0.01, 1.4, 100)  # Current density (A/cm²)
+    temperatures = np.linspace(298.15, 353.15, 10)  # Temperatures (K)
+    r_membrane_values = np.linspace(0.1, 0.3, 5)  # Membrane resistance (ohms·cm²)
+    i_max_values = np.linspace(1.0, 2.0, 5)  # Maximum current density (A/cm²)
 
-# Convert data to a pandas DataFrame
-df = pd.DataFrame(data, columns=['current_density', 'temperature', 'i_max', 'r_membrane', 'voltage'])
+    # Generate data
+    data = []
+    for T in temperatures:
+        for r_membrane in r_membrane_values:
+            for i_max in i_max_values:
+                for i in current_density:
+                    voltage = pemfc_voltage_expanded(i, T, i_max, r_membrane)
+                    power_density = i * voltage
+                    data.append([i, T, i_max, r_membrane, voltage, power_density])
 
-# Save the data to a CSV file
-df.to_csv("pemfc_simulation_data.csv", index=False)
-print("Data saved to 'pemfc_simulation_data.csv'.")
+    # Convert data to a pandas DataFrame
+    df = pd.DataFrame(data, columns=['current_density', 'temperature', 'i_max', 'r_membrane', 'voltage', 'power_density'])
+
+    # Save the data to a CSV file
+    df.to_csv("pemfc_simulation_data.csv", index=False)
+    print("Data saved to 'pemfc_simulation_data.csv'.")
