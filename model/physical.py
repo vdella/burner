@@ -1,67 +1,66 @@
 import numpy as np
-import pandas as pd
-
-# Constants
-R = 8.314  # Universal gas constant (J/mol·K)
-F = 96485  # Faraday's constant (C/mol)
-E0 = 1.229  # Standard reversible potential (V)
-alpha = 0.5  # Charge transfer coefficient
-i0_ref = 0.1  # Reference exchange current density (A/cm²) at 25°C
-T_ref = 298.15  # Reference temperature in Kelvin (25°C)
-activation_energy = 40000  # Activation energy for i0 (J/mol)
+import taguchi
 
 
-# Temperature-dependent exchange current density
-def exchange_current_density(T):
-    return i0_ref * np.exp((activation_energy / R) * (1 / T_ref - 1 / T))
+parameters = {
+    'number_of_cells': 65,
+    'nominal_operating_of_current': 133.3,  # A
+    'nominal_operating_of_voltage': 45,  # V
+    'operating_temperature': 338,  # K
+    'nominal_air_flow_rate': 300,  # lpm
+    'nominal_fuel_flow_rate': 50,  # lpm
+    'fuel_supply_pressure': 1.5,  # bar
+    'air_supply_concentration': 1  # bar
+}
 
 
-# Temperature-dependent ohmic resistance
-def ohmic_resistance(T, r_membrane_ref):
-    return r_membrane_ref * (T_ref / T)
+def nernst(P_h2, P_o2, T):
+    """Calculates the reversible voltage of the cell using the Nernst equation.
+
+    :param P_h2: partial pressure of hydrogen.
+    :param P_o2: partial pressure of oxygen.
+    :param T: operating temperature of the cell.
+
+    :return: reversible voltage of the cell."""
+
+    env_temperature = 298.15
+    return 1.22 - 0.85e-3*(T - env_temperature) + 4.3085e-5*T*np.log(P_h2/P_o2)  # TODO review euler cte.
 
 
-# PEMFC Voltage Model
-def pemfc_voltage_expanded(i, T, i_max, r_membrane_ref):
-    """Calculate expanded PEMFC voltage model."""
-    i0 = exchange_current_density(T)
-    R_ohmic = ohmic_resistance(T, r_membrane_ref)
+def activation_loss(epsilons: tuple, T, o2_concentration, i_cell):
+    """Calculates the activation loss of the cell. Indicates
+    how slow is the reaction on the electrode surface.
 
-    # Activation overpotential (Tafel equation)
-    eta_activation = (R * T / (alpha * F)) * np.log(i / i0)
+    :param epsilons: MUST be a tuple of FOUR values. Those are the
+     semi-empirically obtained parametric coefficients.
+    :param T: operating temperature of the cell.
+    :param o2_concentration: concentration of oxygen at the cathode catalytic interface.
+    :param i_cell: cell current."""
 
-    # Ohmic overpotential
-    eta_ohmic = i * R_ohmic
-
-    # Concentration overpotential
-    eta_concentration = - (R * T / F) * np.log(1 - i / i_max)
-
-    # Cell voltage
-    V = E0 - eta_activation - eta_ohmic + eta_concentration
-    return V
+    return (epsilons[0]
+            + epsilons[1]*T
+            + epsilons[2]*T*np.log(o2_concentration)
+            + epsilons[3]*T*np.log(i_cell))
 
 
-if __name__ == '__main__':
+def ohmic_loss(i, R_m, R_c):
+    """Sum of the resistances against the flow of electrons and ions in the cell.
 
-    # Define parameter ranges
-    current_density = np.linspace(0.01, 1.4, 100)  # Current density (A/cm²)
-    temperatures = np.linspace(298.15, 353.15, 10)  # Temperatures (K)
-    r_membrane_values = np.linspace(0.1, 0.3, 5)  # Membrane resistance (ohms·cm²)
-    i_max_values = np.linspace(1.0, 2.0, 5)  # Maximum current density (A/cm²)
+    :param i: current density. (A/m^2)
+    :param R_m: electronic resistance of the cell.
+    :param R_c: ionic resistance of the cell."""
 
-    # Generate data
-    data = []
-    for T in temperatures:
-        for r_membrane in r_membrane_values:
-            for i_max in i_max_values:
-                for i in current_density:
-                    voltage = pemfc_voltage_expanded(i, T, i_max, r_membrane)
-                    power_density = i * voltage
-                    data.append([i, T, i_max, r_membrane, voltage, power_density])
+    return i * (R_m + R_c)
 
-    # Convert data to a pandas DataFrame
-    df = pd.DataFrame(data, columns=['current_density', 'temperature', 'i_max', 'r_membrane', 'voltage', 'power_density'])
 
-    # Save the data to a CSV file
-    df.to_csv("pemfc_simulation_data.csv", index=False)
-    print("Data saved to 'pemfc_simulation_data.csv'.")
+def concentration_loss(b, J, J_max):
+    """Mass transfer. Output voltage of the fuel cell decreases
+    according to the amount of current drawn from the PEMFc
+    with other physical parameters.
+
+    :param b: parametric coefficient.
+    :param J: actual current density of the cell.
+    :param J_max: maximum current density of the cell.
+    :return: the mass transfer, AKA concentration loss."""
+
+    return -b*np.log(1 - (J / J_max))
