@@ -8,31 +8,26 @@ def control_factors():
 
     return {
         'operating_temperature': [313, 323, 333, 338, 343, 353],  # 6 levels
-        'fuel_flow_rate': [50, 65, 85, 0, 0, 0],  # 3 levels
-        'air_flow_rate': [300, 400, 500, 0, 0, 0],  # 3 levels
-        'fuel_supply_pressure': [1.5, 2.0, 2.5, 0, 0, 0],  # 3 levels
+        'fuel_flow_rate': [50, 65, 85],  # 3 levels
+        'air_flow_rate': [300, 400, 500],  # 3 levels
+        'fuel_supply_pressure': [1.5, 2.0, 2.5],  # 3 levels
     }
 
-# return {
-#     '1': pd.Series([313, 50, 300, 1.5], index=['A', 'B', 'C', 'D']),
-#     '2': pd.Series([323, 65, 400, 2], index=['A', 'B', 'C', 'D']),
-#     '3': pd.Series([333, 85, 500, 2.5], index=['A', 'B', 'C', 'D']),
-#     '4': pd.Series([338, None, None, None], index=['A', 'B', 'C', 'D']),
-#     '5': pd.Series([343, None, None, None], index=['A', 'B', 'C', 'D']),
-#     '6': pd.Series([353, None, None, None], index=['A', 'B', 'C', 'D']),
-# }
 
-# Generate all combinations of levels for the factors
 def combinations():
     factors = control_factors()
+    return list(product(*factors.values()))
 
-    # list(product(*control_factors.values()))
-    return list(product(
-        factors['operating_temperature'],
-        factors['fuel_flow_rate'],
-        factors['air_flow_rate'],
-        factors['fuel_supply_pressure']
-    ))
+
+def showcase_factors():
+    return {
+        '1': pd.Series([313, 50, 300, 1.5], index=['A', 'B', 'C', 'D']),
+        '2': pd.Series([323, 65, 400, 2], index=['A', 'B', 'C', 'D']),
+        '3': pd.Series([333, 85, 500, 2.5], index=['A', 'B', 'C', 'D']),
+        '4': pd.Series([338, None, None, None], index=['A', 'B', 'C', 'D']),
+        '5': pd.Series([343, None, None, None], index=['A', 'B', 'C', 'D']),
+        '6': pd.Series([353, None, None, None], index=['A', 'B', 'C', 'D']),
+    }
 
 
 if __name__ == '__main__':
@@ -42,7 +37,7 @@ if __name__ == '__main__':
     dataframe.to_csv('control_factors.csv', index=False)
 
     # Generate all combinations of levels for the factors
-    all_combinations = list(product(*cf.values()))
+    all_combinations = combinations()
 
     # Convert to a DataFrame
     df_combinations = pd.DataFrame(all_combinations, columns=list(cf.keys()))
@@ -51,6 +46,7 @@ if __name__ == '__main__':
     # Randomly sample a subset of rows to create an orthogonal array
     np.random.seed(42)  # For reproducibility
     orthogonal_array = df_combinations.sample(n=18)  # Example: Select 18 trials
+    orthogonal_array.to_csv('orthogonal_array.csv', index=False)
 
     print("Orthogonal Array (Subset of Combinations):")
     print(orthogonal_array)
