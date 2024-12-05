@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 # Constants
 R = 8.314  # Universal gas constant (J/mol K)
 F = 96485  # Faraday's constant (C/mol)
-E0 = 1.229  # Standard reversible potential (V)
+E0 = 1.229  # Nernst potential (V)
 alpha = 0.5  # Charge transfer coefficient
 P_H2 = 1.0  # Partial pressure of H2 (atm)
 P_O2 = 1.0  # Partial pressure of O2 (atm)
@@ -19,10 +19,11 @@ temperatures = [313, 323, 333, 338, 343, 353]
 
 # Function to calculate polarization curve
 def calculate_voltage(T, current_density):
+    b = 2.3 * (R * T / (alpha * F))
     E = E0 + (R * T / (2 * F)) * np.log(P_ref / (P_H2 * np.sqrt(P_O2)))
-    eta_act = (R * T / (alpha * F)) * np.log(current_density / I0)
+    eta_act = b * np.log(current_density / I0)
     eta_ohm = current_density * R_ohm
-    eta_conc = -(R * T / (2 * F)) * np.log(1 - (current_density / I_lim))
+    eta_conc = (R * T / (2 * F)) * np.log(1 - (current_density / I_lim))
     voltage = E - eta_act - eta_ohm - eta_conc
     return voltage
 
