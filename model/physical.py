@@ -112,43 +112,36 @@ def o2_concentration(P_air, T):
 
 # Example Usage
 if __name__ == "__main__":
-    # Example current
-    current = 100  # Replace with your desired current value (A)
+    # Define range of current densities
+    current_densities = np.linspace(0.01, max_current_density(), 100)  # Avoid 0 to prevent log issues
 
-    # Compute actual current density
-    actual_i_density = actual_current_density_from(current)
-    print(f"Actual Current Density: {actual_i_density} A/cm^2")
+    # Define parameters
+    epsilons = (0.1, 0.01, 0.001, 0.0001)  # Example values for activation loss coefficients
+    T = parameters['operating_temperature']
+    P_h2 = 1.5  # Partial pressure of H2 (atm)
+    P_o2 = 1.0  # Partial pressure of O2 (atm)
+    b = 0.05  # Parametric coefficient for concentration loss
+    R_m = 0.01  # Electronic resistance (ohm·cm²)
+    R_c = 0.02  # Ionic resistance (ohm·cm²)
+    J_max = max_current_density()  # Maximum current density
 
-    # Compute O2 concentration
-    o2_concentration = o2_concentration(parameters.get('air_supply_pressure'), parameters.get('operating_temperature'))
-    print(f"O2 Concentration: {o2_concentration} mol/cm^3")
+    # Calculate voltage for each current density
+    voltages = []
+    for J in current_densities:
+        i_cell = J * parameters['activation_area']  # Calculate current from current density
+        o2_conc = o2_concentration(parameters['air_supply_pressure'], T)
+        voltage = output_voltage(
+            P_h2, P_o2, T, epsilons, o2_conc, i_cell, J, R_m, R_c, b, J_max
+        )
+        voltages.append(voltage)
 
-    results = list()
-    for temp in taguchi.control_factors()['operating_temperature']:
-        for fuel_rate in taguchi.control_factors()['fuel_flow_rate']:
-            for air_rate in taguchi.control_factors()['air_flow_rate']:
-                for fuel_p in taguchi.control_factors()['fuel_supply_pressure']:
-                    P_H2 = fuel_p
-                    P_O2 = parameters.get('air_supply_pressure') / (parameters.get('air_supply_pressure') + fuel_p)
-                    E_nernst = nernst(P_H2, P_O2, temp)
-
-                    V_a = activation_loss((0.2, 0.003, -0.001, 0.01), temp, o2_concentration, current)
-                    V_ohm = ohmic_loss(actual_i_density, 0.003, 0.002)
-                    V_c = concentration_loss(0.05, actual_i_density, max_current_density())
-
-                    V_cell = E_nernst - V_a - V_ohm - V_c
-                    print(f"Temperature: {temp}, Fuel Flow Rate: {fuel_rate}, Air Flow Rate: {air_rate}, Fuel Pressure: {fuel_p}, Cell Voltage: {V_cell}")
-
-                    results.append((temp, fuel_rate, air_rate, fuel_p, V_cell))
-
-
-    # Convert results to a structured array
-    df = pd.DataFrame(results, columns=['Temperature (K)', 'Fuel Flow Rate (lpm)', 'Air Flow Rate (lpm)', 'Fuel Pressure (bar)', 'Cell Voltage (V)'])
-    df.to_csv("PEMFC_simulation_results.csv", index=False)
-
-    # Visualize data (example)
-    plt.plot(taguchi.control_factors()['operating_temperature'], [res[4] for res in results if res[1] == 50 and res[2] == 300 and res[3] == 1.5], label='Fuel Rate 50 lpm, Air Rate 300 lpm, Pressure 1.5 bar')
-    plt.xlabel("Temperature (K)")
-    plt.ylabel("Cell Voltage (V)")
+    # Plot the Voltage-Current Density curve
+    plt.figure(figsize=(8, 6))
+    plt.plot(current_densities, voltages, label="Voltage vs Current Density", linewidth=2)
+    plt.xlabel("Current Density (A/cm²)")
+    plt.ylabel("Voltage (V)")
+    plt.title("PEMFC Voltage-Current Density Curve")
+    plt.grid(True)
     plt.legend()
+    plt.savefig('voltage_current_density_curve.png')
     plt.show()
